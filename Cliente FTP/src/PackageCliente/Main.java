@@ -2,75 +2,184 @@ package PackageCliente;
 
 import java.io.*;
 import java.net.*;
+import java.util.*;
 
 public class Main {
-    private static int puerto = 21;
 
-    public static void OPEN(){
+    private static int puerto;
+    private static String direccion;
+    private static BufferedReader lectura;
+    private static boolean estado;
+    private static Socket socket;
+    private static PrintWriter escritura;
+    private static BufferedReader entrada;
+
+    public static void OPEN(String IP) throws Exception{
+        direccion = IP;
+        puerto = 21;
+
         try {
-            Socket socket = new Socket("127.0.0.1", puerto);
-            BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-
-            bufferedWriter.write("USER " + "yorsh21" + "\r\n");
-            bufferedWriter.flush();
-
-            String response = new String();
-            while ((response = bufferedReader.readLine()) != null) {
-                System.out.println(response);
-            }
+            socket = new Socket(direccion, puerto);
         }catch (Exception e){
-            System.out.println(e);
+            System.out.println("No se pudo conectar al servidor");
         }
+        System.out.println("Conectado a " + direccion + " en el puerto " + Integer.toString(puerto));
+
+        escritura = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
+        entrada = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+        String response = new String();
+        response = entrada.readLine();
+        System.out.println(response);
+
+        if(response.contains("220")){
+            while(true){
+                System.out.print("Name(" + direccion + ":root): ");
+                String mensaje = lectura.readLine();
+                escritura.println(mensaje);
+                escritura.flush();
+
+                response = entrada.readLine();
+                System.out.println(response);
+                if(response.contains("331")){
+                    System.out.print("Password: ");
+                    mensaje = lectura.readLine();
+                    escritura.println(mensaje);
+                    escritura.flush();
+
+                    response = entrada.readLine();
+                    System.out.println(response);
+                    if(response.contains("230")){
+                        estado = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if(!estado){
+            QUIT();
+        }
+        //TransferirArchivo ftp = new TransferirArchivo(socket);
     }
 
-    public static void OPEN2(){
-        try{
-            Socket socket = new Socket("127.0.0.1", 21);
-            PrintWriter salida = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
-            BufferedReader entrada = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+    public static void CD(String comando){
+        escritura.println(comando);
+        escritura.flush();
+        try {
+            System.out.println(entrada.readLine());
+        }catch (Exception e){}
+    }
 
-            String response = new String();
-            while((response = entrada.readLine()) != null)
-                System.out.println(response);
-            salida.flush();
+    public static void LS(String comando){
+        try {
+            escritura = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
+            entrada = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        } catch (Exception e){}
 
-            /*
-            BufferedWriter pw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("log.txt")));
+        escritura.println(comando);
+        escritura.flush();
 
-            while((s = entrada.readLine()) != null)
-                pw.write(s);
-            pw.close();
-
-            if(entrada.readLine() == null)
-                System.out.println("Archivo recibido OK");
-             */
-
-            socket.close();
-
-
+        ArrayList<String> Archivos = new ArrayList<>();
+        String response = new String();
+        try {
+            response = entrada.readLine();
+            System.out.println(response);
+            if(response.contains("150")){
+                while (true){
+                    response = entrada.readLine();
+                    if(response.contains("226")){
+                        break;
+                    }
+                    else {
+                        Archivos.add(response);
+                        System.out.println(response);
+                    }
+                }
+                System.out.println("\n" + response);
+            }
         }catch (Exception e){
             System.out.println("Error: " + e);
         }
+
     }
 
-    public void CD(){
+    public static void GET(String dato){
     }
 
-    public void LS(){
+    public static void PUT(String dato){
     }
 
-    public void GET(){
+    public static void QUIT(){
+        estado = false;
+        System.out.println("Cerrando conexion...");
+        try {
+            socket.close();
+        } catch (Exception e){
+            System.out.println("Error: " + e);
+        } finally {
+            System.out.println("Conexion finalizada");
+        }
+
     }
 
-    public void PUT(){
-    }
+    public static void main(String args[]) throws Exception
+    {
+        estado = false;
+        String teclado = new String();
+        System.out.println("Bienvenido al Cliente FTP");
 
-    public void QUIT(){
-    }
+        try {
+            lectura = new BufferedReader(new InputStreamReader(System.in));
+        }catch (Exception e){
+            System.out.println(e);
+        }
+        OPEN("localhost"); //quitar esta linea
+        while(true){
+            System.out.print("> ");
+            try {
+                teclado = lectura.readLine().trim();
+            }catch (Exception e){
+                System.out.println(e);
+            }
 
-    public static void main(String arg[]){
+            if(teclado.contains("OPEN")) {
+                OPEN(teclado);
+            }
+            else if(teclado.contains("CD")) {
+                CD(teclado);
+            }
+            else if(teclado.contains("LS")) {
+                LS(teclado);
+            }
+            else if(teclado.contains("GET")) {
+                GET(teclado);
+            }
+            else if(teclado.contains("PUT")) {
+                PUT(teclado);
+            }
+            else if(teclado.contains("QUIT")) {
+                QUIT();
+            }
+            else {
+                System.out.println("Comando desconocido.");
+                System.out.println("Utilice: OPEN, CD, LS, GET, PUT, QUIT.");
+            }
+        }
 
-        OPEN2();
+        /*
+        String direccion = "127.0.0.1";
+        int puerto = 21;
+
+        Socket socket = null;
+        System.out.println("Conectando con " + direccion + " en el puerto " + Integer.toString(puerto));
+        try {
+            socket = new Socket(direccion, puerto);
+        }catch (Exception e){
+            System.out.println("No se pudo conectar al servidor");
+            System.exit(0);
+        }
+        TransferirArchivo ftp = new TransferirArchivo(socket);
+        ftp.displayMenu();
+*/
     }
 }
