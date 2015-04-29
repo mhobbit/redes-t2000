@@ -7,6 +7,7 @@ import java.util.*;
 public class Main {
 
     static ServerSocket Servidor;
+    static ServerSocket ServidorData;
     static Socket socketConexion;
     static PrintWriter escritura;
     static BufferedReader lectura;
@@ -15,6 +16,8 @@ public class Main {
     static boolean estado;
     static String directorioRaiz;
     static String directorioActual;
+    static DataInputStream flujoEntrada;
+    static DataOutputStream flujoSalida;
 
     public static void LOGIN(){
         try {
@@ -59,13 +62,15 @@ public class Main {
 
     public static void CD(String carpeta){
         String directorio = new String();
-        String temporal;
+        String temporal[];
+        int largo = 0;
         if(carpeta.contains(" ")){
             directorio = carpeta.split(" ")[1];
             if(directorio.equals("..")){
                 if(!directorioActual.equals(directorioRaiz)) {
-                    temporal = directorioActual.substring(directorioActual.length() - 1);
-                    directorioActual = directorioActual.substring(temporal.lastIndexOf("/"));
+                    temporal = directorioActual.split("/");
+                    largo = temporal[temporal.length - 1].length() + 1;
+                    directorioActual = directorioActual.substring(0, directorioActual.length() - largo);
                 }
                 escritura.println("250 El nuevo directorio de trabajo es " + directorioActual);
             }
@@ -119,40 +124,127 @@ public class Main {
         }
     }
 
-    public static void GET(){
+    public static void GET(String comando) throws Exception{
+        String filename = comando.split(" ")[1];
+        File archivo = new File(directorioActual + filename);
 
+        if(!archivo.exists()) {
+            escritura.println("550 El archivo no existe");
+            escritura.flush();
+            return;
+        }
+        escritura.println("150 Datos de conexion para " + filename);
+        escritura.flush();
+
+        Socket socketData;
+        try {
+            socketData = ServidorData.accept();
+            flujoEntrada = new DataInputStream(socketData.getInputStream());
+            flujoSalida = new DataOutputStream(socketData.getOutputStream());
+        }catch (Exception e){
+            System.out.println(e);
+            return;
+        }
+
+        try {
+            FileInputStream fin = new FileInputStream(archivo);
+            int largo;
+            do {
+                largo = fin.read();
+                flujoSalida.writeUTF(String.valueOf(largo));
+            }
+            while (largo != -1);
+            fin.close();
+        }catch (Exception e){
+            System.out.println(e);
+        }finally {
+            socketData.close();
+        }
+
+        System.out.println(filename + " enviado correctamente");
+        escritura.println("226 Transferencia completada");
+        escritura.flush();
     }
 
-    public static void PUT(){
+    public static void PUT(String comando) throws Exception{
+        String filename = comando.split(" ")[1];
+        File archivo = new File(directorioActual + filename);
 
+        if(archivo.exists()) {
+            escritura.println("552 Archivo ya existente en el servidor");
+            escritura.flush();
+            return;
+        }
+        escritura.println("350 Enviar Archivo");
+        escritura.flush();
+
+        Socket socketData;
+        try {
+            socketData = ServidorData.accept();
+            flujoEntrada = new DataInputStream(socketData.getInputStream());
+            flujoSalida = new DataOutputStream(socketData.getOutputStream());
+        }catch (Exception e){
+            System.out.println(e);
+            return;
+        }
+
+        try {
+            FileOutputStream fout = new FileOutputStream(archivo);
+            int largo;
+            String temp;
+            do {
+                temp = flujoEntrada.readUTF();
+                largo = Integer.parseInt(temp);
+                if (largo != -1) {
+                    fout.write(largo);
+                }
+            } while (largo != -1);
+            fout.close();
+        }catch (Exception e){
+            System.out.println(e);
+            return;
+        } finally {
+            socketData.close();
+        }
+
+        System.out.println(filename + " cargado correctamente");
+        escritura.println("226 " + filename + " subido correctamente");
+        escritura.flush();
     }
 
     public static void QUIT(){
         directorioActual = directorioRaiz;
         estado = false;
+        escritura.println("221 Sesion terminada por el usuario");
+        escritura.flush();
         try {
             socketConexion.close();
+            System.out.println("Conexion finalizada");
+            System.out.println("----------------------------------");
         } catch (Exception e){
             System.out.println("Error: " + e);
+            escritura.println(e);
+            escritura.flush();
         }
     }
 
 
     public static void main(String args[]) throws Exception
     {
-        int puerto = 21;
         directorioRaiz = "Directorio_FTP/";
         directorioActual = "Directorio_FTP/";
         Servidor = null;
+        Servidor = null;
         try {
-            Servidor = new ServerSocket(puerto);
+            Servidor = new ServerSocket( 21 );
+            ServidorData = new ServerSocket( 20 );
         } catch (IOException e) {
             System.out.println("No se ha podido levantar el servidor");
             System.exit ( 0 );
         }
-        System.out.println("Servidor a la escucha...");
 
         while (true) {
+            System.out.println("Servidor a la escucha...");
             socketConexion = null;
             try {
                 socketConexion = Servidor.accept();
@@ -164,7 +256,6 @@ public class Main {
                 escritura.flush();
             } catch (IOException e) {
                 System.out.println("No se ha podido crear el nuevo socket");
-                QUIT();
             }
 
             LOGIN();
@@ -188,6 +279,12 @@ public class Main {
                 }
                 else if(comando.contains("CD")){
                     CD(comando);
+                }
+                else if(comando.contains("GET")){
+                    GET(comando);
+                }
+                else if(comando.contains("PUT")){
+                    PUT(comando);
                 }
                 else
                     escritura.println("502 Comando no implementado");
