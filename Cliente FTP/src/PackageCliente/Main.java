@@ -23,6 +23,7 @@ public class Main {
             socket = new Socket(direccion, 21);
         }catch (Exception e){
             System.out.println("No se pudo conectar al servidor");
+            return;
         }
         System.out.println("Conectado a " + direccion + " en el puerto " + Integer.toString(21));
 
@@ -60,7 +61,6 @@ public class Main {
         if(!estado){
             QUIT();
         }
-        //TransferirArchivo ftp = new TransferirArchivo(socket);
     }
 
     public static void CD(String comando){

@@ -55,7 +55,7 @@ public class Main {
                 escritura.flush();
             }
         }catch (Exception e){
-            System.out.println("Error en Login: " + e);
+            System.out.println("Conexion interrumpida, cliente desconectado");
             QUIT();
         }
     }
